@@ -1,0 +1,28 @@
+{
+  "name": "eufy-bridge",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Eufy Security bridge sidecar: wraps eufy-security-client behind a local token-authenticated websocket",
+  "type": "module",
+  "engines": {
+    "node": ">=24.0.0"
+  },
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "dev": "node scripts/build.mjs && node dist/index.js --port 0 --token dev --data-dir ../.eufy-data --log-level debug",
+    "test": "node --test test/*.test.ts",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "compile": "node scripts/build.mjs && node scripts/compile.mjs",
+    "smoke": "node scripts/smoke.mjs"
+  },
+  "dependencies": {
+    "eufy-security-client": "4.1.1-1",
+    "ws": "^8.18.3"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "@types/ws": "^8.18.1",
+    "esbuild": "^0.25.0",
+    "typescript": "~5.9.0"
+  }
+}

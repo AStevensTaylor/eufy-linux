@@ -5,6 +5,30 @@
   "windows": ["main"],
   "permissions": [
     "core:default",
-    "opener:default"
+    "core:event:default",
+    "core:window:allow-hide",
+    "core:window:allow-show",
+    "core:window:allow-set-focus",
+    "notification:default",
+    "store:default",
+    "opener:default",
+    "autostart:default",
+    {
+      "identifier": "shell:allow-execute",
+      "allow": [
+        {
+          "name": "binaries/eufy-bridge",
+          "sidecar": true,
+          "args": [
+            "--port",
+            { "validator": "^[0-9]{1,5}$" },
+            "--token",
+            { "validator": "^[0-9a-f]{64}$" },
+            "--data-dir",
+            { "validator": "^.+$" }
+          ]
+        }
+      ]
+    }
   ]
 }
