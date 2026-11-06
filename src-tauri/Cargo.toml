@@ -34,7 +34,10 @@ tokio-tungstenite = "0.28"
 futures-util = "0.3"
 rand = "0.9"
 base64 = "0.22"
-thiserror = "2"
+
+# Must match the webkit2gtk version wry (tauri-runtime-wry) links against: `cargo tree -i webkit2gtk`.
+[target.'cfg(any(target_os = "linux", target_os = "dragonfly", target_os = "freebsd", target_os = "netbsd", target_os = "openbsd"))'.dependencies]
+webkit2gtk = "=2.0.2"
 
 # Read the optimization guideline for more details: https://tauri.app/concept/size/#cargo-configuration
 [profile.release]

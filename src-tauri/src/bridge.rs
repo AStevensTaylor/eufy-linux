@@ -293,7 +293,10 @@ async fn run_once<R: Runtime>(app: &AppHandle<R>, bridge: &Bridge, launch: Launc
             let _ = child.kill();
         }
     }
-    log::info!("bridge spawned (pid {pid}), expecting it on port {}", launch.port);
+    log::info!(
+        "bridge spawned (pid {pid}), expecting it on port {}",
+        launch.port
+    );
 
     let mut was_ready = false;
     let mut message = String::from("bridge output ended");
@@ -305,7 +308,8 @@ async fn run_once<R: Runtime>(app: &AppHandle<R>, bridge: &Bridge, launch: Launc
                 Ok(event) => event,
                 Err(_) => {
                     log::warn!("bridge did not report READY within {READY_TIMEOUT:?}");
-                    if let Some(child) = bridge.child.lock().expect("bridge child poisoned").take() {
+                    if let Some(child) = bridge.child.lock().expect("bridge child poisoned").take()
+                    {
                         let _ = child.kill();
                     }
                     message = "bridge did not become ready in time".into();
@@ -330,7 +334,10 @@ async fn run_once<R: Runtime>(app: &AppHandle<R>, bridge: &Bridge, launch: Launc
                         token: token.clone(),
                     };
                     if port != launch.port {
-                        log::warn!("bridge listens on {port}, not the requested {}", launch.port);
+                        log::warn!(
+                            "bridge listens on {port}, not the requested {}",
+                            launch.port
+                        );
                     }
                     was_ready = true;
                     bridge.set_info(app, BridgeInfo::ready(&endpoint));
@@ -475,7 +482,10 @@ fn hex(bytes: &[u8]) -> String {
 /// `EUFY_BRIDGE_DEV=1` forces it, `EUFY_BRIDGE_DEV=0` disables it, otherwise
 /// it follows the build profile (dev in debug builds).
 pub fn dev_mode_enabled() -> bool {
-    dev_mode_from(std::env::var("EUFY_BRIDGE_DEV").ok().as_deref(), cfg!(debug_assertions))
+    dev_mode_from(
+        std::env::var("EUFY_BRIDGE_DEV").ok().as_deref(),
+        cfg!(debug_assertions),
+    )
 }
 
 fn dev_mode_from(env_value: Option<&str>, debug_build: bool) -> bool {
@@ -553,7 +563,10 @@ mod tests {
         let a = generate_token();
         let b = generate_token();
         assert_eq!(a.len(), 64);
-        assert!(a.bytes().all(|c| c.is_ascii_hexdigit() && !c.is_ascii_uppercase()));
+        assert!(
+            a.bytes()
+                .all(|c| c.is_ascii_hexdigit() && !c.is_ascii_uppercase())
+        );
         assert_ne!(a, b);
     }
 
@@ -574,7 +587,14 @@ mod tests {
         let args = bridge_args(4242, "abc", Path::new("/data/bridge"));
         assert_eq!(
             args,
-            vec!["--port", "4242", "--token", "abc", "--data-dir", "/data/bridge"]
+            vec![
+                "--port",
+                "4242",
+                "--token",
+                "abc",
+                "--data-dir",
+                "/data/bridge"
+            ]
         );
     }
 

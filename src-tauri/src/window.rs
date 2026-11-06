@@ -1,9 +1,11 @@
 //! Main window helpers and the Tauri events about it.
 
 use serde::Serialize;
-use tauri::{AppHandle, Emitter, Manager, Runtime};
+use tauri::{
+    AppHandle, Emitter, Manager, Runtime, WebviewUrl, WebviewWindow, WebviewWindowBuilder,
+};
 
-use crate::bridge::Bridge;
+use crate::{bridge::Bridge, snapshot};
 
 /// Label of the main window (see `tauri.conf.json`).
 pub const MAIN: &str = "main";
@@ -16,6 +18,71 @@ pub const OPEN_DEVICE_EVENT: &str = "open-device";
 pub struct OpenDevice<'a> {
     pub serial: &'a str,
     pub reason: &'a str,
+}
+
+/// Creates the (hidden) main window. It is built in code rather than from
+/// `tauri.conf.json` so the Linux webview can be configured: microphone
+/// permission requests (two-way talk) are granted and downloads are routed
+/// to the snapshot directory.
+pub fn create_main<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<WebviewWindow<R>> {
+    let download_app = app.clone();
+    let window = WebviewWindowBuilder::new(app, MAIN, WebviewUrl::default())
+        .title("Eufy Linux")
+        .inner_size(1100.0, 760.0)
+        .min_inner_size(800.0, 600.0)
+        .resizable(true)
+        .visible(false)
+        .center()
+        .on_download(move |_webview, event| snapshot::handle_download(&download_app, event))
+        .build()?;
+    configure_platform_webview(&window)?;
+    Ok(window)
+}
+
+/// WebKitGTK denies `getUserMedia` unless the embedder answers the
+/// `permission-request` signal, so allow user-media requests and make sure
+/// media streams, WebAudio and MSE are enabled.
+#[cfg(any(
+    target_os = "linux",
+    target_os = "dragonfly",
+    target_os = "freebsd",
+    target_os = "netbsd",
+    target_os = "openbsd"
+))]
+fn configure_platform_webview<R: Runtime>(window: &WebviewWindow<R>) -> tauri::Result<()> {
+    window.with_webview(|platform_webview| {
+        use webkit2gtk::{
+            PermissionRequestExt, SettingsExt, UserMediaPermissionRequest, WebViewExt,
+            glib::prelude::*,
+        };
+        let webview = platform_webview.inner();
+        if let Some(settings) = webview.settings() {
+            settings.set_enable_media_stream(true);
+            settings.set_enable_webaudio(true);
+            settings.set_enable_mediasource(true);
+        }
+        webview.connect_permission_request(|_webview, request| {
+            if request.is::<UserMediaPermissionRequest>() {
+                log::info!("granting user media (microphone/camera) permission request");
+                request.allow();
+                true
+            } else {
+                log::debug!("leaving permission request {request:?} to the default handler");
+                false
+            }
+        });
+    })
+}
+
+#[cfg(not(any(
+    target_os = "linux",
+    target_os = "dragonfly",
+    target_os = "freebsd",
+    target_os = "netbsd",
+    target_os = "openbsd"
+)))]
+fn configure_platform_webview<R: Runtime>(_window: &WebviewWindow<R>) -> tauri::Result<()> {
+    Ok(())
 }
 
 /// Shows, un-minimizes and focuses the main window, then emits `window-shown`.
@@ -96,7 +163,10 @@ mod tests {
         assert!(should_start_visible(&args(&["app"]), false));
         assert!(!should_start_visible(&args(&["app", "--minimized"]), false));
         assert!(should_start_visible(&args(&["app", "--show"]), true));
-        assert!(should_start_visible(&args(&["app", "--minimized", "--show"]), true));
+        assert!(should_start_visible(
+            &args(&["app", "--minimized", "--show"]),
+            true
+        ));
     }
 
     #[test]

@@ -1048,9 +1048,9 @@ dependencies = [
  "tauri-plugin-shell",
  "tauri-plugin-single-instance",
  "tauri-plugin-store",
- "thiserror 2.0.21",
  "tokio",
  "tokio-tungstenite",
+ "webkit2gtk",
 ]
 
 [[package]]

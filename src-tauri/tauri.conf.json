@@ -11,26 +11,18 @@
   },
   "app": {
     "withGlobalTauri": false,
-    "windows": [
-      {
-        "label": "main",
-        "title": "Eufy Linux",
-        "width": 1100,
-        "height": 760,
-        "minWidth": 800,
-        "minHeight": 560,
-        "resizable": true,
-        "visible": false,
-        "center": true
-      }
-    ],
+    "windows": [],
     "security": {
       "csp": null
     }
   },
   "bundle": {
     "active": true,
-    "targets": ["deb", "rpm", "appimage"],
+    "targets": [
+      "deb",
+      "rpm",
+      "appimage"
+    ],
     "category": "Utility",
     "shortDescription": "Tray-resident client for Eufy Security doorbells and cameras",
     "icon": [
@@ -40,7 +32,9 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ],
-    "externalBin": ["binaries/eufy-bridge"],
+    "externalBin": [
+      "binaries/eufy-bridge"
+    ],
     "linux": {
       "deb": {
         "depends": [

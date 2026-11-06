@@ -185,7 +185,9 @@ pub fn notification_title(event: &DeviceEvent) -> String {
     let headline = match event.title.as_deref().map(str::trim) {
         Some(t) if !t.is_empty() => t.to_string(),
         _ => match (&event.kind[..], event.person_name.as_deref()) {
-            ("person", Some(name)) if !name.trim().is_empty() => format!("{} detected", name.trim()),
+            ("person", Some(name)) if !name.trim().is_empty() => {
+                format!("{} detected", name.trim())
+            }
             _ => kind_text(&event.kind).to_string(),
         },
     };
@@ -445,7 +447,12 @@ async fn session<R: Runtime>(
 /// Handles one JSON frame; returns a message to send back, if any.
 fn handle_text<R: Runtime>(app: &AppHandle<R>, text: &str, seen: &mut Seen) -> Option<Message> {
     match Incoming::parse(text)? {
-        Incoming::Result { id, ok, result, error } => match id.as_str() {
+        Incoming::Result {
+            id,
+            ok,
+            result,
+            error,
+        } => match id.as_str() {
             "hello" => {
                 if ok {
                     log::info!("authenticated with bridge ({})", result);
@@ -625,7 +632,8 @@ mod tests {
 
     #[test]
     fn parses_result_frames() {
-        let ok = r#"{"type":"result","id":"hello","ok":true,"result":{"version":"1.0.0","protocol":1}}"#;
+        let ok =
+            r#"{"type":"result","id":"hello","ok":true,"result":{"version":"1.0.0","protocol":1}}"#;
         match Incoming::parse(ok).unwrap() {
             Incoming::Result { id, ok, result, .. } => {
                 assert_eq!(id, "hello");
@@ -653,9 +661,10 @@ mod tests {
 
     #[test]
     fn device_event_tolerates_missing_optional_fields() {
-        let ev: DeviceEvent =
-            serde_json::from_value(json!({ "id": "1", "serial": "S", "kind": "motion", "state": true }))
-                .unwrap();
+        let ev: DeviceEvent = serde_json::from_value(
+            json!({ "id": "1", "serial": "S", "kind": "motion", "state": true }),
+        )
+        .unwrap();
         assert!(ev.title.is_none());
         assert!(ev.picture.is_none());
         assert_eq!(ev.device_name, "");
@@ -677,10 +686,34 @@ mod tests {
     #[test]
     fn defaults_notify_everything_and_popup_on_ring_only() {
         let s = Settings::default();
-        assert_eq!(decide(&s, &event("ring", true)), Decision { notify: true, popup: true });
-        assert_eq!(decide(&s, &event("motion", true)), Decision { notify: true, popup: false });
-        assert_eq!(decide(&s, &event("person", true)), Decision { notify: true, popup: false });
-        assert_eq!(decide(&s, &event("pet", true)), Decision { notify: true, popup: false });
+        assert_eq!(
+            decide(&s, &event("ring", true)),
+            Decision {
+                notify: true,
+                popup: true
+            }
+        );
+        assert_eq!(
+            decide(&s, &event("motion", true)),
+            Decision {
+                notify: true,
+                popup: false
+            }
+        );
+        assert_eq!(
+            decide(&s, &event("person", true)),
+            Decision {
+                notify: true,
+                popup: false
+            }
+        );
+        assert_eq!(
+            decide(&s, &event("pet", true)),
+            Decision {
+                notify: true,
+                popup: false
+            }
+        );
     }
 
     #[test]
@@ -694,8 +727,20 @@ mod tests {
         let mut s = Settings::default();
         s.notifications.enabled = false;
         s.popup.on_motion = true;
-        assert_eq!(decide(&s, &event("ring", true)), Decision { notify: false, popup: true });
-        assert_eq!(decide(&s, &event("motion", true)), Decision { notify: false, popup: true });
+        assert_eq!(
+            decide(&s, &event("ring", true)),
+            Decision {
+                notify: false,
+                popup: true
+            }
+        );
+        assert_eq!(
+            decide(&s, &event("motion", true)),
+            Decision {
+                notify: false,
+                popup: true
+            }
+        );
     }
 
     #[test]
@@ -704,15 +749,36 @@ mod tests {
         s.notifications.motion = false;
         s.notifications.other = false;
         s.popup.on_person = true;
-        assert_eq!(decide(&s, &event("radar_motion", true)), Decision { notify: false, popup: false });
-        assert_eq!(decide(&s, &event("vehicle", true)), Decision { notify: false, popup: false });
-        assert_eq!(decide(&s, &event("stranger", true)), Decision { notify: true, popup: true });
+        assert_eq!(
+            decide(&s, &event("radar_motion", true)),
+            Decision {
+                notify: false,
+                popup: false
+            }
+        );
+        assert_eq!(
+            decide(&s, &event("vehicle", true)),
+            Decision {
+                notify: false,
+                popup: false
+            }
+        );
+        assert_eq!(
+            decide(&s, &event("stranger", true)),
+            Decision {
+                notify: true,
+                popup: true
+            }
+        );
     }
 
     #[test]
     fn builds_title_and_body() {
         let mut ev = event("ring", true);
-        assert_eq!(notification_title(&ev), "Front Door: Someone is at the door");
+        assert_eq!(
+            notification_title(&ev),
+            "Front Door: Someone is at the door"
+        );
         assert_eq!(notification_body(&ev), "Someone is at the door");
 
         ev.title = Some("Doorbell pressed".into());

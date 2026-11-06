@@ -7,6 +7,7 @@
 pub mod bridge;
 pub mod notifier;
 pub mod settings;
+pub mod snapshot;
 pub mod tray;
 pub mod window;
 
@@ -65,7 +66,11 @@ fn get_settings(state: State<'_, AppState>) -> Settings {
 }
 
 #[tauri::command]
-fn set_settings(app: AppHandle, state: State<'_, AppState>, settings: Settings) -> Result<(), String> {
+fn set_settings(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    settings: Settings,
+) -> Result<(), String> {
     settings::save(&app, &settings)?;
     let previous = std::mem::replace(
         &mut *state.settings.lock().expect("settings poisoned"),
@@ -140,6 +145,7 @@ pub fn run() {
             Some(vec![MINIMIZED_ARG]),
         ))
         .manage(Bridge::new())
+        .manage(snapshot::Downloads::default())
         .setup(|app| {
             let handle = app.handle().clone();
             let settings = settings::load(&handle);
@@ -149,6 +155,7 @@ pub fn run() {
                 settings: Mutex::new(settings.clone()),
             });
 
+            window::create_main(&handle)?;
             tray::setup(&handle)?;
             notifier::register_click_handler(&handle);
             bridge::start(handle.clone());
@@ -190,7 +197,9 @@ pub fn run() {
         .expect("error while building tauri application")
         .run(|app, event| match event {
             // Tray-resident: closing the last window must not end the process.
-            RunEvent::ExitRequested { code: None, api, .. } => api.prevent_exit(),
+            RunEvent::ExitRequested {
+                code: None, api, ..
+            } => api.prevent_exit(),
             RunEvent::Exit => app.state::<Bridge>().shutdown(),
             _ => {}
         });
