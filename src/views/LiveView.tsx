@@ -4,6 +4,7 @@ import { TalkbackControls } from "../components/TalkbackControls";
 import { formatBytes } from "../lib/format";
 import { LivePlayer, mseSupported } from "../lib/player";
 import { useStore } from "../lib/store";
+import { onSnapshotSaved, subscribeEvent } from "../lib/tauri";
 import { useObservable } from "../lib/useObservable";
 
 export function LiveView({ serial }: { serial: string }) {
@@ -30,6 +31,14 @@ export function LiveView({ serial }: { serial: string }) {
     if (videoRef.current) videoRef.current.muted = muted;
   }, [muted]);
 
+  // The shell announces where it wrote the snapshot (see docs/ARCHITECTURE.md).
+  useEffect(() => {
+    return subscribeEvent(onSnapshotSaved, ({ path }) => {
+      setSnapshotMsg(`Snapshot saved to ${path}`);
+      setTimeout(() => setSnapshotMsg(null), 6_000);
+    });
+  }, []);
+
   const reconnect = async () => {
     await player.stop();
     await player.start();
@@ -50,8 +59,7 @@ export function LiveView({ serial }: { serial: string }) {
     a.click();
     a.remove();
     setTimeout(() => URL.revokeObjectURL(url), 10_000);
-    setSnapshotMsg("Snapshot saved.");
-    setTimeout(() => setSnapshotMsg(null), 3_000);
+    setSnapshotMsg("Saving snapshot…");
   };
 
   if (!device) {

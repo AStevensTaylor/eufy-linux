@@ -152,6 +152,13 @@ export function onWindowShown(handler: Listener<Record<string, never>>): Promise
   return listenSafe<Record<string, never>>("window-shown", handler);
 }
 
+export type SnapshotSavedPayload = { path: string };
+
+/** Fired by the shell after a download started from the UI (a snapshot) has been written to disk. */
+export function onSnapshotSaved(handler: Listener<SnapshotSavedPayload>): Promise<UnlistenFn> {
+  return listenSafe<SnapshotSavedPayload>("snapshot-saved", handler);
+}
+
 /**
  * Helper for React effects: subscribes asynchronously and returns a cleanup
  * that unsubscribes once the subscription resolves (even if it resolves after

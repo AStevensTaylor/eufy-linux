@@ -9,7 +9,12 @@
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
-    "tauri": "tauri"
+    "tauri": "tauri",
+    "sidecar:install": "pnpm --dir sidecar install --ignore-workspace",
+    "sidecar:build": "pnpm --dir sidecar build",
+    "sidecar:compile": "pnpm --dir sidecar compile",
+    "sidecar:test": "pnpm --dir sidecar test",
+    "check": "pnpm test && pnpm build && pnpm --dir sidecar typecheck && pnpm --dir sidecar test && cd src-tauri && cargo test && cargo clippy --all-targets"
   },
   "dependencies": {
     "@tauri-apps/api": "^2",

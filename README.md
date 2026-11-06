@@ -22,6 +22,27 @@ Early development. Doorbells (ring / motion / person events, live view,
 talkback) are the first target; other camera types should work for live view
 and events because they share the same client library, but are untested.
 
+## Quick start
+
+```sh
+export PATH=/opt/node24/bin:$PATH      # Node 24 (eufy-security-client needs >= 24)
+pnpm install --ignore-workspace         # UI deps
+pnpm sidecar:install && pnpm sidecar:build   # bridge → sidecar/dist/index.js
+pnpm tauri dev -- -- --show             # run the app (starts hidden in the tray without --show)
+```
+
+For a packaged build, compile the sidecar binary first, then bundle:
+
+```sh
+pnpm sidecar:compile                    # → src-tauri/binaries/eufy-bridge-<triple> (needs bun)
+pnpm tauri build                        # → src-tauri/target/release/bundle/{deb,rpm,appimage}
+```
+
+`pnpm check` runs every test suite, the type checks and clippy.
+
+Runtime requirements on the target machine: `ffmpeg` (two-way talk) and the
+GStreamer `good`, `bad` and `libav` plugin sets (H.264 live video in WebKitGTK).
+
 ## Building
 
 The desktop shell lives in `src-tauri/` (Rust, Tauri 2). It needs Rust 1.85+ and

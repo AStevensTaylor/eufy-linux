@@ -39,8 +39,10 @@ integration; the bridge owns everything Eufy.
 2. Rust picks a free TCP port and a random token, then launches the sidecar:
    `eufy-bridge --port <port> --token <token> --data-dir <app data dir>`.
    In `tauri dev` the sidecar is run as `node sidecar/dist/index.js …` instead.
-3. The sidecar prints `READY <port>` on stdout once listening.
+3. The sidecar prints `READY <port>` on stdout once listening (45 s timeout).
 4. Rust connects (for notifications) and exposes `get_bridge_info` to the UI.
+   On every (re)connect it asks for `events.recent` so a ring that happened
+   during a brief socket drop (< 60 s old, not yet notified) is still shown.
 5. The UI connects, sends `auth.hello {token}`, then `state.get`.
 6. If the sidecar exits, Rust restarts it with backoff and emits
    `bridge-status` events so the UI can show the state.
@@ -103,8 +105,9 @@ Events (emitted by Rust, listened to in the UI with `listen`):
 | event | payload |
 | --- | --- |
 | `bridge-status` | same shape as `get_bridge_info` result |
-| `open-device` | `{ serial: string, reason: "ring" \| "motion" \| "person" \| "notification" \| "tray" }` |
+| `open-device` | `{ serial: string, reason: "ring" \| "motion" \| "person" \| "notification" }` — may fire before the UI is mounted (best effort, no replay) |
 | `window-shown` | `{}` |
+| `snapshot-saved` | `{ path: string }` — a download started from the UI (snapshot) was written to `~/Pictures/eufy-linux/` |
 
 ```ts
 type Settings = {
@@ -130,3 +133,21 @@ type Settings = {
 Settings are persisted by the Rust side with `tauri-plugin-store` in
 `settings.json` inside the app config dir. Defaults: all notifications on with
 images, popup on ring only, autostart off, startMinimized true, closeToTray true.
+
+`restart_bridge` kills the sidecar; the UI then sees `bridge-status: starting`
+followed by `ready` with a new url/token and must reconnect with the new token.
+
+## Command-line flags
+
+- `--show` forces the main window visible even when `startMinimized` is on.
+- `--minimized` forces it hidden (the autostart entry passes this).
+
+## Webview configuration (Linux)
+
+The main window is created in Rust (`src-tauri/src/window.rs`), not from
+`tauri.conf.json`, so the WebKitGTK view can be configured: microphone
+permission requests (`getUserMedia`, for two-way talk) are granted
+automatically, media streams / WebAudio / MSE are enabled, and downloads
+started by the UI are routed to the snapshot handler. The webview only needs
+the `core` and event-listen capabilities; spawning, settings storage and
+autostart all happen on the Rust side.
