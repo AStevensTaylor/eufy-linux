@@ -5,7 +5,7 @@ import type { Device, Voice } from "../lib/types";
 import { useObservable } from "../lib/useObservable";
 import { formatBytes } from "../lib/format";
 
-export function TalkbackControls({ device }: { device: Device }) {
+export function TalkbackControls({ device, streaming }: { device: Device; streaming: boolean }) {
   const { bridge, bridgeStatus } = useStore();
   const session = useMemo(() => new TalkbackSession(bridge, device.serial), [bridge, device.serial]);
   const info = useObservable(session.info);
@@ -60,12 +60,15 @@ export function TalkbackControls({ device }: { device: Device }) {
       </header>
       {!device.capabilities.talkback && <p className="muted">This device does not support talkback.</p>}
       {!supported && <p className="warn-text">Microphone capture is not available in this webview.</p>}
+      {supported && device.capabilities.talkback && !streaming && (
+        <p className="muted">Start the live view to enable two-way talk.</p>
+      )}
       <div className="talk-row">
         {pushToTalk ? (
           <button
             type="button"
             className={`btn btn-talk ${active ? "active" : ""}`}
-            disabled={!supported || !device.capabilities.talkback || bridgeStatus !== "connected"}
+            disabled={!supported || !device.capabilities.talkback || bridgeStatus !== "connected" || !streaming}
             onPointerDown={onHoldStart}
             onPointerUp={onHoldEnd}
             onPointerLeave={onHoldEnd}
@@ -83,7 +86,7 @@ export function TalkbackControls({ device }: { device: Device }) {
           <button
             type="button"
             className={`btn btn-talk ${active ? "active" : ""}`}
-            disabled={!supported || !device.capabilities.talkback || bridgeStatus !== "connected"}
+            disabled={!supported || !device.capabilities.talkback || bridgeStatus !== "connected" || !streaming}
             onClick={toggle}
           >
             {active ? "Stop talking" : "Start talking"}

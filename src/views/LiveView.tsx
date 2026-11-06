@@ -140,7 +140,7 @@ export function LiveView({ serial }: { serial: string }) {
         )}
       </div>
 
-      {(device.capabilities.talkback || device.capabilities.quickResponse) && <TalkbackControls device={device} />}
+      {(device.capabilities.talkback || device.capabilities.quickResponse) && <TalkbackControls device={device} streaming={info.state === "playing"} />}
     </div>
   );
 }
