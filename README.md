@@ -21,3 +21,88 @@ See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) and
 Early development. Doorbells (ring / motion / person events, live view,
 talkback) are the first target; other camera types should work for live view
 and events because they share the same client library, but are untested.
+
+## Building
+
+The desktop shell lives in `src-tauri/` (Rust, Tauri 2). It needs Rust 1.85+ and
+the usual Tauri Linux packages (`libwebkit2gtk-4.1-dev`, `libgtk-3-dev`,
+`libayatana-appindicator3-dev`, `librsvg2-dev`, `libsoup-3.0-dev`, `libxdo-dev`,
+`patchelf`).
+
+```sh
+# compile + unit tests of the shell alone (no display server needed)
+cd src-tauri
+scripts/ensure-sidecar-placeholder.sh   # once; see "Sidecar binary" below
+cargo build
+cargo test
+cargo clippy --all-targets
+```
+
+### Sidecar binary
+
+`tauri.conf.json` declares `bundle.externalBin: ["binaries/eufy-bridge"]`, so
+Tauri expects `src-tauri/binaries/eufy-bridge-<target-triple>` (for example
+`eufy-bridge-x86_64-unknown-linux-gnu`) to exist at build time. The real file is
+produced by the sidecar build (`pnpm --filter sidecar build`) and is git-ignored.
+Until it exists, `src-tauri/scripts/ensure-sidecar-placeholder.sh` writes a stub
+that only prints an error, which is enough for `cargo build` / `cargo test`.
+
+### Development bridge
+
+In debug builds (`cargo build`, `pnpm tauri dev`) the shell does not run the
+sidecar binary; it runs `node sidecar/dist/index.js --port … --token … --data-dir …`
+(preferring `/opt/node24/bin/node`, else `node` from `PATH`). Environment
+variables:
+
+| variable | effect |
+| --- | --- |
+| `EUFY_BRIDGE_DEV=1` / `0` | force the node bridge on (also in release builds) or off (use the sidecar binary even in debug builds) |
+| `EUFY_BRIDGE_SCRIPT=/path/to/index.js` | bridge script to run instead of `sidecar/dist/index.js` |
+| `EUFY_NODE=/path/to/node` | node executable to use |
+
+If the script is missing the shell falls back to the sidecar binary and logs a
+warning. Start the app with `--show` to force the window to open even when
+`startMinimized` is on; `--minimized` (added by the autostart entry) forces it
+hidden.
+
+### Packaging
+
+`pnpm tauri build` produces `.deb`, `.rpm` and `.AppImage` bundles. The deb/rpm
+packages depend on `ffmpeg` and the GStreamer `good`, `bad` and `libav` plugin
+sets, which WebKitGTK needs for H.264 playback; the AppImage bundles the media
+framework. Logs go to stdout and to `~/.local/share/dev.astevenstaylor.eufy-linux/logs/`;
+settings are stored in `~/.config/dev.astevenstaylor.eufy-linux/settings.json`.
+
+## Frontend
+
+The webview UI lives in `src/` (Vite + React 19 + TypeScript). It talks to the
+bridge sidecar directly over its websocket (`src/lib/bridge.ts`, protocol in
+`docs/PROTOCOL.md`) and to the Rust shell through a few Tauri commands/events
+(`src/lib/tauri.ts`, contract in `docs/ARCHITECTURE.md`).
+
+```
+export PATH=/opt/node24/bin:$PATH   # Node 24
+pnpm install --ignore-workspace     # root deps only; the sidecar installs its own
+pnpm dev                            # Vite on http://localhost:1420 (what `tauri dev` loads)
+pnpm build                          # tsc + vite build → dist/
+pnpm test                           # vitest: frame codec, bridge client, PCM, reducers
+```
+
+Layout:
+
+- `src/lib/types.ts` – protocol types; `frames.ts` – binary frame codec;
+  `bridge.ts` – `BridgeClient` (calls, events, media subscriptions, reconnect).
+- `src/lib/player.ts` – livestream → JMuxer → `<video>` (MSE);
+  `talkback.ts` + `public/worklets/pcm-worklet.js` – mic → 16 kHz PCM frames.
+- `src/lib/store.tsx` – app state (React context + reducer) and the single
+  `BridgeClient` instance; `src/views/*` – Login, Devices, LiveView, Events,
+  Settings.
+
+Running `pnpm dev` in a plain browser (outside Tauri) shows a "bridge
+unavailable" screen with a manual URL/token form, so the UI can be developed
+against a hand-started sidecar (`eufy-bridge --port 8765 --token …`).
+
+Live video needs WebKitGTK to support H.264 via Media Source Extensions:
+install the GStreamer `good`, `bad` and `libav` plugin sets (for example
+`gstreamer1.0-plugins-good gstreamer1.0-plugins-bad gstreamer1.0-libav` on
+Debian/Ubuntu).
