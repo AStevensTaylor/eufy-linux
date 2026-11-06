@@ -65,6 +65,18 @@ warning. Start the app with `--show` to force the window to open even when
 `startMinimized` is on; `--minimized` (added by the autostart entry) forces it
 hidden.
 
+### Webview specifics (Linux)
+
+The main window is created in Rust (`src-tauri/src/window.rs`), not from
+`tauri.conf.json`, so the WebKitGTK view can be configured: `getUserMedia`
+permission requests (microphone for two-way talk) are granted automatically,
+and media streams, WebAudio and MSE are enabled. This pins the `webkit2gtk`
+crate to the version wry links against (`cargo tree -i webkit2gtk`); bump it
+together with Tauri. Downloads started by the UI (snapshots) are written to
+`~/Pictures/eufy-linux/snapshot-<YYYYMMDD-HHMMSS>.<ext>` (or the app data dir
+when there is no pictures dir) and announced with a `snapshot-saved { path }`
+event.
+
 ### Packaging
 
 `pnpm tauri build` produces `.deb`, `.rpm` and `.AppImage` bundles. The deb/rpm
@@ -106,3 +118,22 @@ Live video needs WebKitGTK to support H.264 via Media Source Extensions:
 install the GStreamer `good`, `bad` and `libav` plugin sets (for example
 `gstreamer1.0-plugins-good gstreamer1.0-plugins-bad gstreamer1.0-libav` on
 Debian/Ubuntu).
+
+## Bridge sidecar (`sidecar/`)
+
+Everything Eufy (cloud login, push notifications, P2P livestream, two-way talk)
+lives in a small Node 24 bridge that the Tauri shell spawns as a sidecar and
+talks to over a local websocket (see `docs/ARCHITECTURE.md` and `docs/PROTOCOL.md`).
+
+```sh
+cd sidecar
+pnpm install --ignore-workspace   # Node >= 24 required
+pnpm test && pnpm typecheck
+pnpm build        # -> sidecar/dist/index.js (used by `tauri dev`)
+pnpm compile      # -> src-tauri/binaries/eufy-bridge-<target-triple> (needs bun)
+pnpm smoke        # starts the bridge, waits for READY, pings it over the websocket
+```
+
+Two-way talk needs `ffmpeg` on the PATH at runtime (PCM from the microphone is
+transcoded to AAC/ADTS). Credentials and eufy state are stored under the app
+data dir passed as `--data-dir`. Details in `sidecar/README.md`.

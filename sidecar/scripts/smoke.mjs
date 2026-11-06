@@ -2,7 +2,7 @@
 // waits for `READY <port>`, authenticates and sends bridge.ping + auth.status.
 // Exits 0 when everything answers as expected.
 import { spawn } from "node:child_process";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, rmSync, existsSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -26,7 +26,7 @@ function fail(msg) {
   child.kill("SIGKILL");
   process.exit(1);
 }
-const timeout = setTimeout(() => fail("timed out"), 20000);
+const timeout = setTimeout(() => fail("timed out"), 40000);
 
 const port = await new Promise((resolve) => {
   let buf = "";
@@ -73,6 +73,40 @@ console.log("state.get ->", JSON.stringify(state));
 const bad = await call("device.get", { serial: "nope" });
 console.log("device.get (logged out) ->", JSON.stringify(bad));
 if (bad.ok || bad.error.code !== "not_logged_in") fail("expected not_logged_in");
+
+if (!process.env.SMOKE_NO_LOGIN) {
+  // Exercise eufy-security-client's initialize() inside the bundle (protobuf/CA
+  // assets, MQTT/push setup). No real account: we expect the connection attempt
+  // to fail or still be pending; what matters is that nothing crashes and that
+  // logout tears everything down again.
+  const stderrLines = [];
+  child.stderr.on("data", (d) => stderrLines.push(d.toString()));
+  const statuses = [];
+  ws.on("message", (data, isBinary) => {
+    if (isBinary) return;
+    const msg = JSON.parse(data.toString());
+    if (msg.type === "event" && msg.event === "auth.status") statuses.push(msg.data.state);
+  });
+  const login = await call("auth.login", { username: "smoke@example.invalid", password: "not-a-real-password" });
+  console.log("auth.login ->", JSON.stringify(login));
+  if (!login.ok) fail("auth.login was rejected");
+  const until = Date.now() + Number(process.env.SMOKE_LOGIN_WAIT_MS ?? 12000);
+  while (Date.now() < until && !statuses.some((s) => s !== "connecting")) await new Promise((r) => setTimeout(r, 200));
+  const st = await call("auth.status");
+  console.log(`auth.status after login probe -> ${JSON.stringify(st.result)} (seen: ${statuses.join(" > ") || "none"})`);
+  if (!statuses.includes("connecting")) fail("expected auth.status connecting after login");
+  // eufy-security-client logs "Error loading ... proto" / ENOENT on the .proto/.crt files when
+  // the bundled assets are not where the rewritten __dirname points.
+  const protoErrors = stderrLines.filter((l) => /(\.proto|\.crt|loading .*proto)/i.test(l) && /error|ENOENT/i.test(l));
+  if (protoErrors.length) fail(`asset loading problems in bridge log: ${protoErrors.join("")}`);
+  const logout = await call("auth.logout");
+  console.log("auth.logout ->", JSON.stringify(logout));
+  if (!logout.ok) fail("auth.logout failed");
+  const after = await call("auth.status");
+  if (after.result.state !== "logged_out") fail("expected logged_out after logout");
+  if (existsSync(path.join(dataDir, "credentials.json"))) fail("credentials.json still present after logout");
+  console.log("login probe OK (eufy-security-client initialized inside the bundle)");
+}
 
 ws.close();
 clearTimeout(timeout);

@@ -43,6 +43,7 @@ const DOORBELL = {
   properties: { name: "Front Door", enabled: true, battery: 88, picture: { data: Buffer.from("x"), type: { mime: "image/jpeg", ext: "jpg" } }, nested: { when: new Date(0), big: 10n } },
   voices: { 1: { voice_id: 1, desc: "Leave the package" }, 2: { voice_id: 2, desc: "Be right there" } },
 };
+const FFMPEG = await findFfmpeg();
 const SENSOR = { serial: "T8900SENSOR01", stationSerial: "T8010STATION01", name: "Door sensor", sensor: true, type: 2, commands: [], properties: { sensorOpen: false } };
 
 type Ctx = { dataDir: string; bridge: Bridge; eufy: FakeEufy | null; client: FakeClient; ffmpeg: string | null; log: Logger; logLines: string[] };
@@ -261,7 +262,11 @@ describe("bridge", () => {
     await expectError(call(ctx, "device.voices", { serial: SENSOR.serial }), "unsupported");
     // debounced device.updated follows the property change
     await waitFor(() => ctx.client.of("device.updated").length > 0, 1500, "device.updated");
+    // the real library reports the mode change as a station property change
+    ctx.eufy!.emit("station property changed", ctx.eufy!.stations.get("T8010STATION01")!, "guardMode", 63);
+    assert.deepEqual(ctx.client.last("station.property_changed"), { serial: "T8010STATION01", name: "guardMode", value: 63 });
     await waitFor(() => ctx.client.of("station.updated").length > 0, 1500, "station.updated");
+    assert.equal(ctx.client.last("station.updated").guardMode, 63);
   });
 
   test("device events: mapping, push title, picture attach, ring buffer, device.picture", async () => {
@@ -459,8 +464,8 @@ describe("bridge", () => {
     assert.equal(c2.of("talkback.stopped").length, 2);
   });
 
-  test("talkback: PCM is transcoded to ADTS by ffmpeg", { skip: (await findFfmpeg()) === null ? "ffmpeg not installed" : false }, async () => {
-    ctx.ffmpeg = await findFfmpeg();
+  test("talkback: PCM is transcoded to ADTS by ffmpeg", { skip: FFMPEG === null ? "ffmpeg not installed" : false }, async () => {
+    ctx.ffmpeg = FFMPEG;
     await loginAndConnect(ctx);
     const eufy = ctx.eufy!;
     await call(ctx, "livestream.start", { serial: DOORBELL.serial });

@@ -8,14 +8,20 @@ import type { Logger } from "./log.ts";
  * ffmpeg arguments: 16 kHz mono s16le PCM in, AAC-LC in ADTS framing out,
  * the format eufy-security-client's TalkbackStream expects (same settings
  * as the Home Assistant / homebridge integrations use for talkback).
+ * Note: `-fflags nobuffer` must NOT be used on the raw input; with ffmpeg 6
+ * it silently produces no output for s16le on a pipe. `-probesize 32
+ * -analyzeduration 0` keep the startup latency at ~150 ms instead of ~2 s.
  */
 export const FFMPEG_TALKBACK_ARGS = [
   "-hide_banner",
   "-loglevel",
   "error",
   "-nostdin",
-  "-fflags",
-  "nobuffer",
+  // without these ffmpeg buffers ~2 s of input for stream analysis before emitting anything
+  "-probesize",
+  "32",
+  "-analyzeduration",
+  "0",
   "-f",
   "s16le",
   "-ar",
